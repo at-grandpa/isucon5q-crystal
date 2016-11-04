@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html" charset="utf-8">
+<link rel="stylesheet" href="/css/bootstrap.min.css">
+<title>ISUxi</title>
+</head>
+
+<body class="container">
+<h1 class="jumbotron"><a href="/">ISUxiへようこそ!</a></h1>
+
+<h2>友だちリスト</h2>
+<div class="row panel panel-primary" id="friends">
+  <dl>
+  <% friends.each do |friend_data| -%>
+    <% friend = get_user(friend_data.id) -%>
+    <dt class="friend-date"><%= friend_data.created_at.to_s("%Y-%m-%d %H:%M:%S") %></dt><dd class="friend-friend"><a href="/profile/<%= friend.account_name %>"><%= friend.nick_name %></a></dd>
+  <% end -%>
+  </dl>
+</div>
+
+</body>
+</html>

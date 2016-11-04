@@ -1,0 +1,22 @@
+version: 1.0
+shards:
+  kemal:
+    github: at-grandpa/kemal
+    commit: 9ba57c60735b5f876891313fd2302da79cadb2c5
+
+  kilt:
+    github: jeromegn/kilt
+    version: 0.3.3
+
+  multipart:
+    github: RX14/multipart.cr
+    version: 0.1.0
+
+  mysql:
+    github: at-grandpa/crystal-mysql
+    commit: e423981a96800cd3f59a10c0d89f98f3acca5a94
+
+  radix:
+    github: luislavena/radix
+    version: 0.3.1
+

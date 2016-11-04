@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html" charset="utf-8">
+<link rel="stylesheet" href="/css/bootstrap.min.css">
+<title>ISUxi</title>
+</head>
+
+<body class="container">
+<h1 class="jumbotron"><a href="/">ISUxiへようこそ!</a></h1>
+
+<h2>あしあとリスト</h2>
+<div class="row panel panel-primary" id="footprints">
+  <ul class="list-group">
+    <% footprints.each do |fp| %>
+      <% owner = get_user(fp.owner_id) %>
+      <li class="list-group-item footprints-footprint"><%= fp.updated_at %>: <a href="/profile/<%= owner.account_name %>"><%= owner.nick_name %>さん</a>
+    <% end %>
+  </ul>
+</div>
+
+</body>
+</html>

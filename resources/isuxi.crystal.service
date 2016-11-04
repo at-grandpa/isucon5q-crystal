@@ -1,0 +1,10 @@
+[Unit]
+Description=isuxi-crystal
+After=syslog.target
+
+[Service]
+WorkingDirectory=/home/isucon/webapp/crystal
+ExecStart=/home/isucon/webapp/crystal/app -p 8080
+
+[Install]
+WantedBy=multi-user.target

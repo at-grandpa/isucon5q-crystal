@@ -1,0 +1,15 @@
+name: isucon5q-crystal
+version: 0.1.0
+
+authors:
+  - at-grandpa <yoshiyuki.tsuchida.k@gmail.com>
+
+license: MIT
+
+dependencies:
+  kemal:
+    github: at-grandpa/kemal
+    branch: add-content-length
+  mysql:
+    github: at-grandpa/crystal-mysql
+    branch: multi-byte-char-support
