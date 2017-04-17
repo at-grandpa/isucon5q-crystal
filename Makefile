@@ -70,6 +70,7 @@ build: start/isuxi.crystal build/app
 
 REPOSITORY=isucon5q-crystal
 TAG=default
+CONTAINER_NAME=isucon5q-crystal
 
 HOST_WORKDIR=$(PWD)
 CONTAINER_WORKDIR=/home/isucon/isucon5q-crystal
@@ -77,5 +78,19 @@ CONTAINER_WORKDIR=/home/isucon/isucon5q-crystal
 docker/build:
 	docker build --tag=$(REPOSITORY):$(TAG) .
 
+docker/run:
+	docker run -d -v $(HOST_WORKDIR):$(CONTAINER_WORKDIR) --name $(CONTAINER_NAME) -it $(REPOSITORY):$(TAG)
+
+docker/start:
+	docker start $(CONTAINER_NAME)
+
+docker/stop:
+	docker stop $(CONTAINER_NAME)
+
 docker/attach:
-	docker run -v $(HOST_WORKDIR):$(CONTAINER_WORKDIR) -u isucon -it $(REPOSITORY):$(TAG)
+	docker exec -u isucon -it $(CONTAINER_NAME) /bin/bash
+
+DOCKER_EXEC=docker exec -it $(CONTAINER_NAME)
+
+docker/webapp/start:
+	$(DOCKER_EXEC) $(COMMAND)
