@@ -14,6 +14,10 @@ RUN git clone https://github.com/matsuu/ansible-isucon.git
 WORKDIR /root/setup/ansible-isucon/isucon5-qualifier
 RUN PYTHONUNBUFFERED=1 ANSIBLE_FORCE_COLOR=true ansible-playbook -i local bench/ansible/playbook.yml
 RUN apt-get install -y libsslcommon2-dev
+RUN apt-get install -y libssl-dev
+rUN apt-get install -y pkg-config
+rUN apt-get install -y libcurl4-openssl-dev
+
 RUN PYTHONUNBUFFERED=1 ANSIBLE_FORCE_COLOR=true ansible-playbook -i local image/ansible/playbook.yml
 
 RUN apt-get -y install apt-transport-https
