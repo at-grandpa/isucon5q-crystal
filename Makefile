@@ -72,10 +72,10 @@ REPOSITORY=isucon5q-crystal
 TAG=default
 
 HOST_WORKDIR=$(PWD)
-CONTAINER_WORKDIR=/root/isucon
+CONTAINER_WORKDIR=/home/isucon/isucon5q-crystal
 
 docker/build:
 	docker build --tag=$(REPOSITORY):$(TAG) .
 
 docker/attach:
-	docker run -v $(HOST_WORKDIR):$(CONTAINER_WORKDIR) -it $(REPOSITORY):$(TAG)
+	docker run -v $(HOST_WORKDIR):$(CONTAINER_WORKDIR) -u isucon -it $(REPOSITORY):$(TAG)
