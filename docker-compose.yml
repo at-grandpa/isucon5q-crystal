@@ -1,0 +1,20 @@
+version: '2'
+services:
+  app:
+    build: .
+    container_name: isucon5q-crystal-app
+    image: isucon5q-crystal:default
+    stdin_open: true
+    privileged: true
+    volumes:
+      - .:/home/isucon/isucon5q-crystal
+    ports:
+      - 3000:3000
+    links:
+      - redis
+    command: /sbin/init
+  redis:
+    image: redis:3.2
+    container_name: isucon5q-crystal-redis
+    ports:
+      - 6380:6379

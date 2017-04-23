@@ -68,29 +68,32 @@ build/app:
 
 build: start/isuxi.crystal build/app
 
-REPOSITORY=isucon5q-crystal
-TAG=default
-CONTAINER_NAME=isucon5q-crystal
+DOCKER_COMPOSE := docker-compose -f ./docker-compose.yml
+CONTAINER_NAME := isucon5q-crystal-app
+DOCKER_EXEC := docker exec -it
+REPOSITORY := isucon5q-crystal
+TAG := default
 
-HOST_WORKDIR=$(PWD)
-CONTAINER_WORKDIR=/home/isucon/isucon5q-crystal
+docker/ps:
+	$(DOCKER_COMPOSE) ps
 
 docker/build:
-	docker build --tag=$(REPOSITORY):$(TAG) .
+	$(DOCKER_COMPOSE) build
 
-docker/run:
-	docker run -d -v $(HOST_WORKDIR):$(CONTAINER_WORKDIR) --name $(CONTAINER_NAME) -it $(REPOSITORY):$(TAG)
+docker/isucon/setup: docker/up docker/isucon/images/setup
 
-docker/start:
-	docker start $(CONTAINER_NAME)
+docker/up:
+	$(DOCKER_COMPOSE) up -d
+
+docker/isucon/images/setup:
+	$(DOCKER_EXEC) $(CONTAINER_NAME) /bin/bash /home/isucon/isucon5q-crystal/setup.sh
 
 docker/stop:
-	docker stop $(CONTAINER_NAME)
+	$(DOCKER_COMPOSE) stop
+
+docker/rm:
+	$(DOCKER_COMPOSE) rm
 
 docker/attach:
-	docker exec -u isucon -it $(CONTAINER_NAME) /bin/bash
+	$(DOCKER_EXEC) -u isucon $(CONTAINER_NAME) /bin/bash
 
-DOCKER_EXEC=docker exec -it $(CONTAINER_NAME)
-
-docker/webapp/start:
-	$(DOCKER_EXEC) $(COMMAND)
