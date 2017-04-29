@@ -99,3 +99,11 @@ docker/rm:
 docker/attach:
 	$(DOCKER_EXEC) -u isucon $(CONTAINER_NAME) /bin/bash
 
+docker/isucon/build/app:
+	$(DOCKER_EXEC) -u isucon $(CONTAINER_NAME) /bin/bash -c " \
+		cd /home/isucon/isucon5q-crystal && \
+		crystal build -o /home/isucon/webapp/crystal/app /home/isucon/isucon5q-crystal/src/isucon5q-crystal.cr --error-trace && \
+		sudo systemctl restart isuxi.crystal \
+		"
+
+

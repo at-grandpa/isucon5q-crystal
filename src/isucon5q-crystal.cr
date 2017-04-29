@@ -1,14 +1,18 @@
 require "./isucon5q-crystal/*"
 require "kemal"
+require "kemal-session"
+require "db"
 require "mysql"
 
 module Isucon5q
   class Webapp
     # initialize
 
+    @db : DB::Database
+
     def initialize(@env : HTTP::Server::Context)
       @user = User.new(0, "default_user", "df_user", "example@example.com")
-      @db = DB.new
+      @db = DB.open "mysql://root@localhost/isucon5q"
     end
 
     # structs
@@ -57,78 +61,78 @@ module Isucon5q
 
     # database class
 
-    class DB
-      def config
-        @config ||= {
-          db: {
-            host:     "localhost",
-            port:     3306_u16,
-            username: "root",
-            password: "",
-            database: "isucon5q",
-          },
-        }
-      end
-
-      @conn : (MySQL::Connection | Nil)
-      getter conn
-
-      def conn
-        @conn ||= MySQL.connect(
-          config[:db][:host],
-          config[:db][:username],
-          config[:db][:password],
-          config[:db][:database],
-          config[:db][:port],
-          nil # socket
-        )
-      end
-
-      def exec(query : String)
-        MySQL::Query.new(query).run(conn)
-      end
-
-      def exec(query : String, params)
-        MySQL::Query.new(query, params).run(conn)
-      end
-
-      def exec(types : T, query : String)
-        rows = MySQL::Query.new(query).run(conn)
-        raise "query result is nil" if rows.is_a?(Nil)
-        result = [] of typeof(first(types, rows))
-        each(types, rows) { |r| result << r }
-        result
-      end
-
-      def exec(types : T, query : String, params)
-        rows = MySQL::Query.new(query, params).run(conn)
-        raise "query result is nil" if rows.is_a?(Nil)
-        result = [] of typeof(first(types, rows))
-        each(types, rows) { |r| result << r }
-        result
-      end
-
-      private def first(types : T, rows)
-        each(types, rows) { |row| return row }
-        raise "this should be unreachable"
-      end
-
-      macro generate_private_each(from, to)
-        {% for n in (from..to) %}
-        private def each(types : Tuple({% for i in (1...n) %}Class, {% end %} Class), rows)
-          rows.each do |row|
-            yield ({
-              {% for j in (0...n) %}
-                types[{{j}}].cast(row[{{j}}]),
-              {% end %}
-            })
-          end
-        end
-        {% end %}
-      end
-
-      generate_private_each(1, 32)
-    end
+    #    class DB
+    #      def config
+    #        @config ||= {
+    #          db: {
+    #            host:     "localhost",
+    #            port:     3306_u16,
+    #            username: "root",
+    #            password: "",
+    #            database: "isucon5q",
+    #          },
+    #        }
+    #      end
+    #
+    #      @conn : (MySQL::Connection | Nil)
+    #      getter conn
+    #
+    #      def conn
+    #        @conn ||= MySQL.connect(
+    #          config[:db][:host],
+    #          config[:db][:username],
+    #          config[:db][:password],
+    #          config[:db][:database],
+    #          config[:db][:port],
+    #          nil # socket
+    #        )
+    #      end
+    #
+    #      def exec(query : String)
+    #        MySQL::Query.new(query).run(conn)
+    #      end
+    #
+    #      def exec(query : String, params)
+    #        MySQL::Query.new(query, params).run(conn)
+    #      end
+    #
+    #      def exec(types : T, query : String)
+    #        rows = MySQL::Query.new(query).run(conn)
+    #        raise "query result is nil" if rows.is_a?(Nil)
+    #        result = [] of typeof(first(types, rows))
+    #        each(types, rows) { |r| result << r }
+    #        result
+    #      end
+    #
+    #      def exec(types : T, query : String, params)
+    #        rows = MySQL::Query.new(query, params).run(conn)
+    #        raise "query result is nil" if rows.is_a?(Nil)
+    #        result = [] of typeof(first(types, rows))
+    #        each(types, rows) { |r| result << r }
+    #        result
+    #      end
+    #
+    #      private def first(types : T, rows)
+    #        each(types, rows) { |row| return row }
+    #        raise "this should be unreachable"
+    #      end
+    #
+    #      macro generate_private_each(from, to)
+    #        {% for n in (from..to) %}
+    #        private def each(types : Tuple({% for i in (1...n) %}Class, {% end %} Class), rows)
+    #          rows.each do |row|
+    #            yield ({
+    #              {% for j in (0...n) %}
+    #                types[{{j}}].cast(row[{{j}}]),
+    #              {% end %}
+    #            })
+    #          end
+    #        end
+    #        {% end %}
+    #      end
+    #
+    #      generate_private_each(1, 32)
+    #    end
 
     # helper methods
 
@@ -143,7 +147,7 @@ module Isucon5q
          WHERE u.email = :email
            AND u.passhash = SHA2(CONCAT(:password, s.salt), 512)
       SQL
-      result = @db.exec({Int32, String, String, String}, query, {"email" => email, "password" => password})
+      result = @db.exec(query, {"email" => email, "password" => password})
       id, account_name, nick_name, email = result.first
       user = User.new(id, account_name, nick_name, email)
       @env.session["user_id"] = user.id.to_s
@@ -159,7 +163,7 @@ module Isucon5q
           FROM users
          WHERE id=:user_id
       SQL
-      result = @db.exec({Int32, String, String, String}, query, {"user_id" => @env.session["user_id"]})
+      result = @db.exec(query, {"user_id" => @env.session["user_id"]})
       id, account_name, nick_name, email = result.first
       @user = User.new(id, account_name, nick_name, email)
     end
@@ -176,7 +180,7 @@ module Isucon5q
           FROM users
          WHERE id = :user_id
       SQL
-      result = @db.exec({Int32, String, String, String, String}, query, {"user_id" => user_id})
+      result = @db.exec(query, {"user_id" => user_id})
       id, account_name, nick_name, email, passhash = result.first
       return User.new(id, account_name, nick_name, email)
     end
@@ -187,7 +191,7 @@ module Isucon5q
           FROM users
          WHERE account_name = :account_name
       SQL
-      result = @db.exec({Int32, String, String, String, String}, query, {"account_name" => account_name})
+      result = @db.exec(query, {"account_name" => account_name})
       id, account_name, nick_name, email, passhash = result.first
       return User.new(id, account_name, nick_name, email)
     end
@@ -201,7 +205,7 @@ module Isucon5q
          WHERE (one = :user_id AND another = :another_id)
             OR (one = :another_id AND another = :user_id)
       SQL
-      result = @db.exec({Int64}, query, {"user_id" => user_id, "another_id" => another_id})
+      result = @db.exec(query, {"user_id" => user_id, "another_id" => another_id})
       cnt = result.first.first
       cnt > 0 ? true : false
     end
@@ -232,9 +236,9 @@ module Isucon5q
     end
 
     PREFS = ["未入力",
-      "北海道", "青森県", "岩手県", "宮城県", "秋田県", "山形県", "福島県", "茨城県", "栃木県", "群馬県", "埼玉県", "千葉県", "東京都", "神奈川県", "新潟県", "富山県",
-      "石川県", "福井県", "山梨県", "長野県", "岐阜県", "静岡県", "愛知県", "三重県", "滋賀県", "京都府", "大阪府", "兵庫県", "奈良県", "和歌山県", "鳥取県", "島根県",
-      "岡山県", "広島県", "山口県", "徳島県", "香川県", "愛媛県", "高知県", "福岡県", "佐賀県", "長崎県", "熊本県", "大分県", "宮崎県", "鹿児島県", "沖縄県"]
+             "北海道", "青森県", "岩手県", "宮城県", "秋田県", "山形県", "福島県", "茨城県", "栃木県", "群馬県", "埼玉県", "千葉県", "東京都", "神奈川県", "新潟県", "富山県",
+             "石川県", "福井県", "山梨県", "長野県", "岐阜県", "静岡県", "愛知県", "三重県", "滋賀県", "京都府", "大阪府", "兵庫県", "奈良県", "和歌山県", "鳥取県", "島根県",
+             "岡山県", "広島県", "山口県", "徳島県", "香川県", "愛媛県", "高知県", "福岡県", "佐賀県", "長崎県", "熊本県", "大分県", "宮崎県", "鹿児島県", "沖縄県"]
 
     def prefectures
       PREFS
@@ -243,11 +247,9 @@ module Isucon5q
     # endpoints
 
     def get_login
-      @env.session.delete("user_id")
+      Session.destroy("user_id")
       message = "高負荷に耐えられるSNSコミュニティサイトへようこそ!"
       render "src/views/login.ecr"
-    ensure
-      @db.conn.close
     end
 
     def post_login
@@ -255,15 +257,11 @@ module Isucon5q
       password = @env.params.body["password"].to_s
       return nil if authenticate(email, password).nil?
       @env.redirect "/"
-    ensure
-      @db.conn.close
     end
 
     def get_logout
-      @env.session.delete("user_id")
+      Session.destroy("user_id")
       @env.redirect "/login"
-    ensure
-      @db.conn.close
     end
 
     def get_root
@@ -280,7 +278,7 @@ module Isucon5q
           FROM profiles
          WHERE user_id = :user_id
       SQL
-      result = @db.exec({Int32, String, String, String, Time, String, Time}, query, {"user_id" => user.id})
+      result = @db.exec(query, {"user_id" => user.id})
       user_id, first_name, last_name, sex, birthday, pref, updated_at = result.first
       profile = Profile.new(user_id, first_name, last_name, sex, birthday, pref, updated_at)
 
@@ -292,7 +290,7 @@ module Isucon5q
            WHERE user_id = :user_id
         ORDER BY created_at LIMIT 5
       SQL
-      result = @db.exec({Int32, Int32, Bool, Slice(UInt8), Time}, query, {"user_id" => user.id})
+      result = @db.exec(query, {"user_id" => user.id})
       entries = [] of Entry
       result.each do |record|
         id, user_id, private_flag, body, created_at = record
@@ -313,7 +311,7 @@ module Isucon5q
            WHERE e.user_id = :user_id
         ORDER BY c.created_at DESC LIMIT 10
       SQL
-      result = @db.exec({Int32, Int32, Int32, Slice(UInt8), Time}, query, {"user_id" => user.id})
+      result = @db.exec(query, {"user_id" => user.id})
       comments_for_me = [] of Comment
       result.each do |record|
         id, entry_id, user_id, comment, created_at = record
@@ -334,7 +332,7 @@ module Isucon5q
         ORDER BY created_at DESC
            LIMIT 1000
       SQL
-      result = @db.exec({Int32, Int32, Bool, Slice(UInt8), Time}, query)
+      result = @db.exec(query)
       entries_of_friends = [] of Entry
       result.each do |record|
         id, user_id, private_flag, body, created_at = record
@@ -352,7 +350,7 @@ module Isucon5q
         ORDER BY created_at DESC
            LIMIT 1000
       SQL
-      result = @db.exec({Int32, Int32, Int32, Slice(UInt8), Time}, query)
+      result = @db.exec(query)
       comments_of_friends = [] of Comment
       result.each do |record|
         id, entry_id, user_id, comment, created_at = record
@@ -364,7 +362,7 @@ module Isucon5q
             FROM entries
            WHERE id = :entry_id
         SQL
-        result = @db.exec({Int32, Int32, Bool, Slice(UInt8), Time}, query, {"entry_id" => entry_id})
+        result = @db.exec(query, {"entry_id" => entry_id})
         id, user_id, private_flag, body, created_at = result.first
         title, content = HTML.escape(String.new(body, "UTF-8")).split('\n', 2)
         entry = Entry.new(id, user_id, private_flag, title, content, created_at)
@@ -382,7 +380,7 @@ module Isucon5q
               OR another = :user_id
         ORDER BY created_at DESC
       SQL
-      result = @db.exec({Int32, Int32, Int32, Time}, query, {"user_id" => user.id})
+      result = @db.exec(query, {"user_id" => user.id})
       friends_map = {} of Int32 => Time
       result.each do |record|
         id, one, another, created_at = record
@@ -407,7 +405,7 @@ module Isucon5q
         ORDER BY updated DESC
            LIMIT 10
       SQL
-      result = @db.exec({Int32, Int32, Time, Time}, query, {"user_id" => user.id})
+      result = @db.exec(query, {"user_id" => user.id})
       footprints = [] of Footprint
       result.each do |record|
         user_id, owner_id, date, updated = record
@@ -415,8 +413,6 @@ module Isucon5q
       end
 
       render "src/views/index.ecr"
-    ensure
-      @db.conn.close
     end
 
     def get_profile_account_name
@@ -431,7 +427,7 @@ module Isucon5q
           FROM profiles
          WHERE user_id = :user_id
       SQL
-      result = @db.exec({Int32, String, String, String, Time, String, Time}, query, {"user_id" => owner.id})
+      result = @db.exec(query, {"user_id" => owner.id})
       user_id, first_name, last_name, sex, birthday, pref, updated_at = result.first
       prof = Profile.new(user_id, first_name, last_name, sex, birthday, pref, updated_at)
 
@@ -454,7 +450,7 @@ module Isucon5q
                 SQL
               end
 
-      result = @db.exec({Int32, Int32, Bool, Slice(UInt8), Time}, query, {"user_id" => owner.id})
+      result = @db.exec(query, {"user_id" => owner.id})
       entries = [] of Entry
       result.each do |record|
         id, user_id, private_flag, body, created_at = record
@@ -470,8 +466,6 @@ module Isucon5q
       return nil if c_user.is_a?(Nil)
 
       render "src/views/profile.ecr"
-    ensure
-      @db.conn.close
     end
 
     def post_profile_account_name
@@ -499,7 +493,7 @@ module Isucon5q
       }
 
       query = "SELECT * FROM profiles WHERE user_id = :user_id"
-      result = @db.exec({Int32, String, String, String, Time, String, Time}, query, {"user_id" => c_user.id})
+      result = @db.exec(query, {"user_id" => c_user.id})
       unless result.first.is_a?(Nil)
         query = <<-SQL
           UPDATE profiles
@@ -519,8 +513,6 @@ module Isucon5q
       end
       @db.exec(query, args)
       @env.redirect "/profile/#{account_name}"
-    ensure
-      @db.conn.close
     end
 
     def get_diary_entries_account_name
@@ -549,7 +541,7 @@ module Isucon5q
                 SQL
               end
 
-      result = @db.exec({Int32, Int32, Bool, Slice(UInt8), Time}, query, {"user_id" => owner.id})
+      result = @db.exec(query, {"user_id" => owner.id})
       entries = [] of Entry
       result.each do |record|
         id, user_id, private_flag, body, created_at = record
@@ -563,8 +555,6 @@ module Isucon5q
       myself = c_user.is_a?(Nil) ? false : (c_user.id == owner.id)
 
       render "src/views/entries.ecr"
-    ensure
-      @db.conn.close
     end
 
     def get_diary_entry_entry_id
@@ -577,7 +567,7 @@ module Isucon5q
           FROM entries
          WHERE id = :entry_id
       SQL
-      result = @db.exec({Int32, Int32, Bool, Slice(UInt8), Time}, query, {"entry_id" => entry_id})
+      result = @db.exec(query, {"entry_id" => entry_id})
       entries = [] of Entry
       id, user_id, private_flag, body, created_at = result.first
       title, content = HTML.escape(String.new(body, "UTF-8")).split('\n', 2)
@@ -594,7 +584,7 @@ module Isucon5q
           FROM comments
          WHERE entry_id = :entry_id
       SQL
-      result = @db.exec({Int32, Int32, Int32, Slice(UInt8), Time}, query, {"entry_id" => entry.id})
+      result = @db.exec(query, {"entry_id" => entry.id})
       comments = [] of Comment
       result.each do |record|
         id, entry_id, user_id, comment, created_at = record
@@ -604,8 +594,6 @@ module Isucon5q
       mark_footprint(owner.id)
 
       render "src/views/entry.ecr"
-    ensure
-      @db.conn.close
     end
 
     def post_diary_entry
@@ -626,8 +614,6 @@ module Isucon5q
       SQL
       @db.exec(query, {"user_id" => c_user.id, "private_flag" => private_flag, "body" => body})
       @env.redirect "/diary/entries/#{c_user.account_name}"
-    ensure
-      @db.conn.close
     end
 
     def post_diary_comment_entry_id
@@ -640,7 +626,7 @@ module Isucon5q
           FROM entries
          WHERE id = :entry_id
       SQL
-      result = @db.exec({Int32, Int32, Bool, Slice(UInt8), Time}, query, {"entry_id" => entry_id})
+      result = @db.exec(query, {"entry_id" => entry_id})
       entries = [] of Entry
       id, user_id, private_flag, body, created_at = result.first
       title, content = HTML.escape(String.new(body, "UTF-8")).split('\n', 2)
@@ -660,8 +646,6 @@ module Isucon5q
       SQL
       @db.exec(query, {"entry_id" => entry.id, "user_id" => c_user.id, "comment" => @env.params.body["comment"]})
       @env.redirect "/diary/entry/#{entry.id}"
-    ensure
-      @db.conn.close
     end
 
     def get_footprints
@@ -682,15 +666,13 @@ module Isucon5q
         ORDER BY updated DESC
            LIMIT 50
       SQL
-      result = @db.exec({Int32, Int32, Time, Time}, query, {"user_id" => c_user.id})
+      result = @db.exec(query, {"user_id" => c_user.id})
       footprints = [] of Footprint
       result.each do |record|
         user_id, owner_id, date, updated = record
         footprints << Footprint.new(user_id, owner_id, date, updated)
       end
       render "src/views/footprints.ecr"
-    ensure
-      @db.conn.close
     end
 
     def get_friends
@@ -707,7 +689,7 @@ module Isucon5q
               OR another = :another
         ORDER BY created_at DESC
       SQL
-      result = @db.exec({Int32, Int32, Int32, Time}, query, {"one" => c_user.id, "another" => c_user.id})
+      result = @db.exec(query, {"one" => c_user.id, "another" => c_user.id})
       friends = [] of Friend
       result.each do |record|
         id, one, another, created_at = record
@@ -716,8 +698,6 @@ module Isucon5q
         friends << Friend.new(key_id, created_at)
       end
       render "src/views/friends.ecr"
-    ensure
-      @db.conn.close
     end
 
     def post_friends_account_name
@@ -742,8 +722,6 @@ module Isucon5q
         @db.exec(query, {"current_user_id" => c_user.id, "account_name_user_id" => user.id})
         @env.redirect "/friends"
       end
-    ensure
-      @db.conn.close
     end
 
     # initialize endpoint
@@ -753,14 +731,12 @@ module Isucon5q
       @db.exec("DELETE FROM footprints WHERE id >  500000")
       @db.exec("DELETE FROM entries    WHERE id >  500000")
       @db.exec("DELETE FROM comments   WHERE id > 1500000")
-    ensure
-      @db.conn.close
     end
   end
 end
 
 error 401 do |env|
-  env.session.delete("user_id")
+  Session.destroy("user_id")
   message = "ログインに失敗しました"
   render "src/views/login.ecr"
 end
