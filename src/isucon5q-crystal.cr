@@ -147,24 +147,24 @@ module Isucon5q
          WHERE u.email = :email
            AND u.passhash = SHA2(CONCAT(:password, s.salt), 512)
       SQL
-      result = @db.exec(query, {"email" => email, "password" => password})
-      id, account_name, nick_name, email = result.first
+      rs = @db.query(query, {"email" => email, "password" => password})
+      id, account_name, nick_name, email = rs.read(Int32), rs.read(String), rs.read(String), rs.read(String)
       user = User.new(id, account_name, nick_name, email)
-      @env.session["user_id"] = user.id.to_s
-      result
+      @env.session.int("user_id", user.id)
+      rs
     end
 
     def current_user
       instance_user = @user
       return instance_user unless instance_user.id == 0
-      return nil if @env.session["user_id"]?.is_a?(Nil)
+      return nil if @env.session.int?("user_id").is_a?(Nil)
       query = <<-SQL
         SELECT id, account_name, nick_name, email
           FROM users
          WHERE id=:user_id
       SQL
-      result = @db.exec(query, {"user_id" => @env.session["user_id"]})
-      id, account_name, nick_name, email = result.first
+      rs = @db.query(query, {"user_id" => @env.session.int("user_id")})
+      id, account_name, nick_name, email = rs.read(Int32), rs.read(String), rs.read(String), rs.read(String)
       @user = User.new(id, account_name, nick_name, email)
     end
 
@@ -180,8 +180,8 @@ module Isucon5q
           FROM users
          WHERE id = :user_id
       SQL
-      result = @db.exec(query, {"user_id" => user_id})
-      id, account_name, nick_name, email, passhash = result.first
+      rs = @db.query(query, {"user_id" => user_id})
+      id, account_name, nick_name, email, passhash = rs.read(Int32), rs.read(String), rs.read(String), rs.read(String), rs.read(String)
       return User.new(id, account_name, nick_name, email)
     end
 
@@ -191,22 +191,22 @@ module Isucon5q
           FROM users
          WHERE account_name = :account_name
       SQL
-      result = @db.exec(query, {"account_name" => account_name})
-      id, account_name, nick_name, email, passhash = result.first
+      rs = @db.query(query, {"account_name" => account_name})
+      id, account_name, nick_name, email, passhash = rs.read(Int32), rs.read(String), rs.read(String), rs.read(String), rs.read(String)
       return User.new(id, account_name, nick_name, email)
     end
 
     def is_friend?(another_id : Int32)
-      return false if @env.session["user_id"]?.is_a?(Nil)
-      user_id = @env.session["user_id"]
+      return false if @env.session.int?("user_id").is_a?(Nil)
+      user_id = @env.session.int?("user_id")
       query = <<-SQL
         SELECT COUNT(1) AS cnt
           FROM relations
          WHERE (one = :user_id AND another = :another_id)
             OR (one = :another_id AND another = :user_id)
       SQL
-      result = @db.exec(query, {"user_id" => user_id, "another_id" => another_id})
-      cnt = result.first.first
+      rs = @db.query(query, {"user_id" => user_id, "another_id" => another_id})
+      cnt = rs.read(Int32)
       cnt > 0 ? true : false
     end
 
@@ -278,8 +278,8 @@ module Isucon5q
           FROM profiles
          WHERE user_id = :user_id
       SQL
-      result = @db.exec(query, {"user_id" => user.id})
-      user_id, first_name, last_name, sex, birthday, pref, updated_at = result.first
+      rs = @db.query(query, {"user_id" => user.id})
+      user_id, first_name, last_name, sex, birthday, pref, updated_at = rs.read(Int32), rs.read(String), rs.read(String), rs.read(String), rs.read(Time), rs.read(String), rs.read(Time)
       profile = Profile.new(user_id, first_name, last_name, sex, birthday, pref, updated_at)
 
       # entries
@@ -290,11 +290,11 @@ module Isucon5q
            WHERE user_id = :user_id
         ORDER BY created_at LIMIT 5
       SQL
-      result = @db.exec(query, {"user_id" => user.id})
+      rs = @db.query(query, {"user_id" => user.id})
       entries = [] of Entry
-      result.each do |record|
-        id, user_id, private_flag, body, created_at = record
-        title, content = HTML.escape(String.new(body, "UTF-8")).split('\n', 2)
+      rs.each do
+        id, user_id, private_flag, body, created_at = rs.read(Int32), rs.read(Int32), rs.read(Bool), rs.read(String), rs.read(Time)
+        title, content = HTML.escape(body).split('\n', 2)
         entries << Entry.new(id, user_id, private_flag, title, content, created_at)
       end
 
@@ -311,15 +311,15 @@ module Isucon5q
            WHERE e.user_id = :user_id
         ORDER BY c.created_at DESC LIMIT 10
       SQL
-      result = @db.exec(query, {"user_id" => user.id})
+      rs = @db.query(query, {"user_id" => user.id})
       comments_for_me = [] of Comment
-      result.each do |record|
-        id, entry_id, user_id, comment, created_at = record
+      rs.each do
+        id, entry_id, user_id, comment, created_at = rs.read(Int32), rs.read(Int32), rs.read(Int32), rs.read(String), rs.read(Time)
         comments_for_me << Comment.new(
           id,
           entry_id,
           user_id,
-          HTML.escape(String.new(comment, "utf8")),
+          HTML.escape(comment),
           created_at
         )
       end
@@ -332,11 +332,11 @@ module Isucon5q
         ORDER BY created_at DESC
            LIMIT 1000
       SQL
-      result = @db.exec(query)
+      rs = @db.query(query)
       entries_of_friends = [] of Entry
-      result.each do |record|
-        id, user_id, private_flag, body, created_at = record
-        title, content = HTML.escape(String.new(body, "UTF-8")).split('\n', 2)
+      rs.each do
+        id, user_id, private_flag, body, created_at = rs.read(Int32), rs.read(Int32), rs.read(Bool), rs.read(String), rs.read(Time)
+        title, content = HTML.escape(body).split('\n', 2)
         next if !is_friend?(user_id)
         entries_of_friends << Entry.new(id, user_id, private_flag, title, content, created_at)
         break if entries_of_friends.size >= 10
@@ -350,11 +350,11 @@ module Isucon5q
         ORDER BY created_at DESC
            LIMIT 1000
       SQL
-      result = @db.exec(query)
+      rs = @db.query(query)
       comments_of_friends = [] of Comment
-      result.each do |record|
-        id, entry_id, user_id, comment, created_at = record
-        comment = HTML.escape(String.new(comment, "UTF-8"))
+      rs.each do
+        id, entry_id, user_id, comment, created_at = rs.read(Int32), rs.read(Int32), rs.read(Int32), rs.read(String), rs.read(Time)
+        comment = HTML.escape(comment)
         c = Comment.new(id, entry_id, user_id, comment, created_at)
         next if !is_friend?(user_id)
         query = <<-SQL
@@ -362,9 +362,9 @@ module Isucon5q
             FROM entries
            WHERE id = :entry_id
         SQL
-        result = @db.exec(query, {"entry_id" => entry_id})
-        id, user_id, private_flag, body, created_at = result.first
-        title, content = HTML.escape(String.new(body, "UTF-8")).split('\n', 2)
+        rs = @db.query(query, {"entry_id" => entry_id})
+        id, user_id, private_flag, body, created_at = rs.read(Int32), rs.read(Int32), rs.read(Bool), rs.read(String), rs.read(Time)
+        title, content = HTML.escape(body).split('\n', 2)
         entry = Entry.new(id, user_id, private_flag, title, content, created_at)
         next if entry.private_flag && !permitted?(entry.user_id)
         comments_of_friends << c
@@ -380,10 +380,10 @@ module Isucon5q
               OR another = :user_id
         ORDER BY created_at DESC
       SQL
-      result = @db.exec(query, {"user_id" => user.id})
+      rs = @db.query(query, {"user_id" => user.id})
       friends_map = {} of Int32 => Time
-      result.each do |record|
-        id, one, another, created_at = record
+      rs.each do
+        id, one, another, created_at = rs.read(Int32), rs.read(Int32), rs.read(Int32), rs.read(Time)
         friend_id = (one == user.id) ? another : one
         friends_map[friend_id] = created_at unless friends_map.has_key?(friend_id)
       end
@@ -405,10 +405,10 @@ module Isucon5q
         ORDER BY updated DESC
            LIMIT 10
       SQL
-      result = @db.exec(query, {"user_id" => user.id})
+      rs = @db.query(query, {"user_id" => user.id})
       footprints = [] of Footprint
-      result.each do |record|
-        user_id, owner_id, date, updated = record
+      rs.each do
+        user_id, owner_id, date, updated = rs.read(Int32), rs.read(Int32), rs.read(Time), rs.read(Time)
         footprints << Footprint.new(user_id, owner_id, date, updated)
       end
 
@@ -427,8 +427,8 @@ module Isucon5q
           FROM profiles
          WHERE user_id = :user_id
       SQL
-      result = @db.exec(query, {"user_id" => owner.id})
-      user_id, first_name, last_name, sex, birthday, pref, updated_at = result.first
+      rs = @db.query(query, {"user_id" => owner.id})
+      user_id, first_name, last_name, sex, birthday, pref, updated_at = rs.read(Int32), rs.read(String), rs.read(String), rs.read(String), rs.read(Time), rs.read(String), rs.read(Time)
       prof = Profile.new(user_id, first_name, last_name, sex, birthday, pref, updated_at)
 
       query = if permitted?(owner.id)
@@ -450,11 +450,11 @@ module Isucon5q
                 SQL
               end
 
-      result = @db.exec(query, {"user_id" => owner.id})
+      rs = @db.query(query, {"user_id" => owner.id})
       entries = [] of Entry
-      result.each do |record|
-        id, user_id, private_flag, body, created_at = record
-        title, content = HTML.escape(String.new(body, "UTF-8")).split('\n', 2)
+      rs.each do
+        id, user_id, private_flag, body, created_at = rs.read(Int32), rs.read(Int32), rs.read(Bool), rs.read(String), rs.read(Time)
+        title, content = HTML.escape(body).split('\n', 2)
         entries << Entry.new(id, user_id, private_flag, title, content, created_at)
       end
       mark_footprint(owner.id)
@@ -493,8 +493,8 @@ module Isucon5q
       }
 
       query = "SELECT * FROM profiles WHERE user_id = :user_id"
-      result = @db.exec(query, {"user_id" => c_user.id})
-      unless result.first.is_a?(Nil)
+      rs = @db.query(query, {"user_id" => c_user.id})
+      unless rs.is_a?(Nil)
         query = <<-SQL
           UPDATE profiles
              SET first_name = :first_name,
@@ -541,11 +541,11 @@ module Isucon5q
                 SQL
               end
 
-      result = @db.exec(query, {"user_id" => owner.id})
+      rs = @db.query(query, {"user_id" => owner.id})
       entries = [] of Entry
-      result.each do |record|
-        id, user_id, private_flag, body, created_at = record
-        title, content = HTML.escape(String.new(body, "UTF-8")).split('\n', 2)
+      rs.each do
+        id, user_id, private_flag, body, created_at = rs.read(Int32), rs.read(Int32), rs.read(Bool), rs.read(String), rs.read(Time)
+        title, content = HTML.escape(body).split('\n', 2)
         entries << Entry.new(id, user_id, private_flag, title, content, created_at)
       end
       mark_footprint(owner.id)
@@ -567,10 +567,9 @@ module Isucon5q
           FROM entries
          WHERE id = :entry_id
       SQL
-      result = @db.exec(query, {"entry_id" => entry_id})
-      entries = [] of Entry
-      id, user_id, private_flag, body, created_at = result.first
-      title, content = HTML.escape(String.new(body, "UTF-8")).split('\n', 2)
+      rs = @db.query(query, {"entry_id" => entry_id})
+      id, user_id, private_flag, body, created_at = rs.read(Int32), rs.read(Int32), rs.read(Bool), rs.read(String), rs.read(Time)
+      title, content = HTML.escape(body).split('\n', 2)
       entry = Entry.new(id, user_id, private_flag, title, content, created_at)
       owner = get_user(entry.user_id)
 
@@ -584,11 +583,11 @@ module Isucon5q
           FROM comments
          WHERE entry_id = :entry_id
       SQL
-      result = @db.exec(query, {"entry_id" => entry.id})
+      rs = @db.query(query, {"entry_id" => entry.id})
       comments = [] of Comment
-      result.each do |record|
-        id, entry_id, user_id, comment, created_at = record
-        comment = HTML.escape(String.new(comment, "UTF-8"))
+      rs.each do |record|
+        id, entry_id, user_id, comment, created_at = rs.read(Int32), rs.read(Int32), rs.read(Int32), rs.read(String), rs.read(Time)
+        comment = HTML.escape(comment)
         comments << Comment.new(id, entry_id, user_id, comment, created_at)
       end
       mark_footprint(owner.id)
@@ -626,10 +625,9 @@ module Isucon5q
           FROM entries
          WHERE id = :entry_id
       SQL
-      result = @db.exec(query, {"entry_id" => entry_id})
-      entries = [] of Entry
-      id, user_id, private_flag, body, created_at = result.first
-      title, content = HTML.escape(String.new(body, "UTF-8")).split('\n', 2)
+      rs = @db.query(query, {"entry_id" => entry_id})
+      id, user_id, private_flag, body, created_at = rs.read(Int32), rs.read(Int32), rs.read(Bool), rs.read(String), rs.read(Time)
+      title, content = HTML.escape(body).split('\n', 2)
       entry = Entry.new(id, user_id, private_flag, title, content, created_at)
 
       if entry.private_flag && !permitted?(entry.user_id)
@@ -666,10 +664,10 @@ module Isucon5q
         ORDER BY updated DESC
            LIMIT 50
       SQL
-      result = @db.exec(query, {"user_id" => c_user.id})
+      rs = @db.query(query, {"user_id" => c_user.id})
       footprints = [] of Footprint
-      result.each do |record|
-        user_id, owner_id, date, updated = record
+      rs.each do |record|
+        user_id, owner_id, date, updated = rs.read(Int32), rs.read(Int32), rs.read(Time), rs.read(Time)
         footprints << Footprint.new(user_id, owner_id, date, updated)
       end
       render "src/views/footprints.ecr"
@@ -689,10 +687,10 @@ module Isucon5q
               OR another = :another
         ORDER BY created_at DESC
       SQL
-      result = @db.exec(query, {"one" => c_user.id, "another" => c_user.id})
+      rs = @db.query(query, {"one" => c_user.id, "another" => c_user.id})
       friends = [] of Friend
-      result.each do |record|
-        id, one, another, created_at = record
+      rs.each do |record|
+        id, one, another, created_at = rs.read(Int32), rs.read(Int32), rs.read(Int32), rs.read(Time)
         key_id = (one == c_user.id ? another : one)
         next if friends.map { |f| f.id }.includes?(key_id)
         friends << Friend.new(key_id, created_at)
