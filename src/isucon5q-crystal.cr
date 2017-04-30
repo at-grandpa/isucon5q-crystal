@@ -77,15 +77,9 @@ module Isucon5q
          WHERE u.email = ?
            AND u.passhash = SHA2(CONCAT(?, s.salt), 512)
       SQL
-      @db.query(query, email, password) do |rs|
-        rs.each do
-          id, account_name, nick_name, email = rs.read(Int32), rs.read(String), rs.read(String), rs.read(String)
-          user = User.new(id, account_name, nick_name, email)
-          @env.session.int("user_id", user.id)
-        end
-        return true
-      end
-      return nil
+      id, account_name, nick_name, email = @db.query_one(query, email, password, as: {Int32, String, String, String})
+      user = User.new(id, account_name, nick_name, email)
+      @env.session.int("user_id", user.id)
     end
 
     def current_user
@@ -97,13 +91,8 @@ module Isucon5q
           FROM users
          WHERE id = ?
       SQL
-      @db.query(query, @env.session.int("user_id")) do |rs|
-        rs.each do
-          id, account_name, nick_name, email = rs.read(Int32), rs.read(String), rs.read(String), rs.read(String)
-          @user = User.new(id, account_name, nick_name, email)
-        end
-      end
-      @user
+      id, account_name, nick_name, email = @db.query_one(query, @env.session.int("user_id"), as: {Int32, String, String, String})
+      @user = User.new(id, account_name, nick_name, email)
     end
 
     def authenticated!
@@ -118,14 +107,8 @@ module Isucon5q
           FROM users
          WHERE id = ?
       SQL
-      @db.query(query, user_id) do |rs|
-        rs.each do
-          id, account_name, nick_name, email, passhash = rs.read(Int32), rs.read(String), rs.read(String), rs.read(String), rs.read(String)
-          return User.new(id, account_name, nick_name, email)
-        end
-      end
-      # ダミーなので、バグの原因になるかも
-      @user
+      id, account_name, nick_name, email, passhash = @db.query_one(query, user_id, as: {Int32, String, String, String, String})
+      User.new(id, account_name, nick_name, email)
     end
 
     def user_from_account(account_name : String)
@@ -134,14 +117,8 @@ module Isucon5q
           FROM users
          WHERE account_name = ?
       SQL
-      @db.query(query, account_name) do |rs|
-        rs.each do
-          id, account_name, nick_name, email, passhash = rs.read(Int32), rs.read(String), rs.read(String), rs.read(String), rs.read(String)
-          return User.new(id, account_name, nick_name, email)
-        end
-      end
-      # ダミーなので、バグの原因になるかも
-      @user
+      id, account_name, nick_name, email, passhash = @db.query_one(query, account_name, as: {Int32, String, String, String, String})
+      return User.new(id, account_name, nick_name, email)
     end
 
     def is_friend?(another_id : Int32)
@@ -153,12 +130,8 @@ module Isucon5q
          WHERE (one = ? AND another = ?)
             OR (one = ? AND another = ?)
       SQL
-      @db.query(query, user_id, another_id, another_id, user_id) do |rs|
-        rs.each do
-          cnt = rs.read(Int64)
-          return cnt > 0 ? true : false
-        end
-      end
+      cnt = @db.query_one(query, user_id, another_id, another_id, user_id, as: Int64)
+      return cnt > 0 ? true : false
     end
 
     def is_friend_account?(name : String)
@@ -229,14 +202,8 @@ module Isucon5q
           FROM profiles
          WHERE user_id = ?
       SQL
-      profile = nil
-      @db.query(query, user.id) do |rs|
-        rs.each do
-          user_id, first_name, last_name, sex, birthday, pref, updated_at = rs.read(Int32), rs.read(String), rs.read(String), rs.read(String), rs.read(Time), rs.read(String), rs.read(Time)
-          profile = Profile.new(user_id, first_name, last_name, sex, birthday, pref, updated_at)
-        end
-      end
-      return nil if profile.nil?
+      user_id, first_name, last_name, sex, birthday, pref, updated_at = @db.query_one(query, user.id, as: {Int32, String, String, String, Time, String, Time})
+      profile = Profile.new(user_id, first_name, last_name, sex, birthday, pref, updated_at)
 
       # entries
 
@@ -247,12 +214,10 @@ module Isucon5q
         ORDER BY created_at LIMIT 5
       SQL
       entries = [] of Entry
-      @db.query(query, user.id) do |rs|
-        rs.each do
-          id, user_id, private_flag, body, created_at = rs.read(Int32), rs.read(Int32), rs.read(Bool), rs.read(String), rs.read(Time)
-          title, content = HTML.escape(body).split('\n', 2)
-          entries << Entry.new(id, user_id, private_flag, title, content, created_at)
-        end
+      @db.query_all(query, user.id, as: {Int32, Int32, Bool, String, Time }).each do |row|
+        id, user_id, private_flag, body, created_at = row
+        title, content = HTML.escape(body).split('\n', 2)
+        entries << Entry.new(id, user_id, private_flag, title, content, created_at)
       end
 
       # comments_for_me
@@ -269,17 +234,15 @@ module Isucon5q
         ORDER BY c.created_at DESC LIMIT 10
       SQL
       comments_for_me = [] of Comment
-      @db.query(query, user.id) do |rs|
-        rs.each do
-          id, entry_id, user_id, comment, created_at = rs.read(Int32), rs.read(Int32), rs.read(Int32), rs.read(String), rs.read(Time)
-          comments_for_me << Comment.new(
-            id,
-            entry_id,
-            user_id,
-            HTML.escape(comment),
-            created_at
-          )
-        end
+      @db.query_all(query, user.id, as: {Int32, Int32, Int32, String, Time}).each do |row|
+        id, entry_id, user_id, comment, created_at = row
+        comments_for_me << Comment.new(
+          id,
+          entry_id,
+          user_id,
+          HTML.escape(comment),
+          created_at
+        )
       end
 
       # entries_of_friends
