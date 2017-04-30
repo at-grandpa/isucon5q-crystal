@@ -206,7 +206,7 @@ module Isucon5q
             OR (one = :another_id AND another = :user_id)
       SQL
       rs = @db.query(query, {"user_id" => user_id, "another_id" => another_id})
-      cnt = rs.read(Int32)
+      cnt = rs.read(Int64)
       cnt > 0 ? true : false
     end
 
@@ -585,7 +585,7 @@ module Isucon5q
       SQL
       rs = @db.query(query, {"entry_id" => entry.id})
       comments = [] of Comment
-      rs.each do |record|
+      rs.each do
         id, entry_id, user_id, comment, created_at = rs.read(Int32), rs.read(Int32), rs.read(Int32), rs.read(String), rs.read(Time)
         comment = HTML.escape(comment)
         comments << Comment.new(id, entry_id, user_id, comment, created_at)
@@ -599,9 +599,15 @@ module Isucon5q
       auth = authenticated!
       return nil if auth.is_a?(Nil)
 
-      private_flag = @env.params.body.has_key?("private") ? "1" : "0"
-      title = @env.params.body["title"]
-      content = @env.params.body["content"]
+      private_flag = @env.params.query.has_key?("private") ? "1" : "0"
+      title = @env.params.query["title"]
+      if title.is_a?(Array(String))
+        title = title.first
+      end
+      content = @env.params.query["content"]
+      if content.is_a?(Array(String))
+        content = content.first
+      end
       body = (title || "タイトルなし") + "\n" + content
 
       c_user = current_user
@@ -666,7 +672,7 @@ module Isucon5q
       SQL
       rs = @db.query(query, {"user_id" => c_user.id})
       footprints = [] of Footprint
-      rs.each do |record|
+      rs.each do
         user_id, owner_id, date, updated = rs.read(Int32), rs.read(Int32), rs.read(Time), rs.read(Time)
         footprints << Footprint.new(user_id, owner_id, date, updated)
       end
@@ -689,7 +695,7 @@ module Isucon5q
       SQL
       rs = @db.query(query, {"one" => c_user.id, "another" => c_user.id})
       friends = [] of Friend
-      rs.each do |record|
+      rs.each do
         id, one, another, created_at = rs.read(Int32), rs.read(Int32), rs.read(Int32), rs.read(Time)
         key_id = (one == c_user.id ? another : one)
         next if friends.map { |f| f.id }.includes?(key_id)

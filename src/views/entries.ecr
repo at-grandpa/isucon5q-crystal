@@ -47,8 +47,8 @@
     <% end -%>
     <div class="entry-created-at">更新日時: <%= entry.created_at.to_s("%Y-%m-%d %H:%M:%S") %></div>
     <% query = "SELECT COUNT(*) AS c FROM comments WHERE entry_id = :entry_id" -%>
-    <% result = @db.exec({Int64}, query, {"entry_id" => entry.id}) -%>
-    <% cnt = result.first.first -%>
+    <% rs  = @db.query(query, {"entry_id" => entry.id}) -%>
+    <% cnt = rs.read(Int64) -%>
     <div class="entry-comments">コメント: <%= cnt %>件</div>
   </div>
   <% end -%>

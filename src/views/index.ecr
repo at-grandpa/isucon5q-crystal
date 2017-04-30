@@ -90,8 +90,8 @@
       <ul class="list-group">
         <% comment_owner = get_user(comment.user_id) -%>
         <% query = "SELECT id, user_id, private, CAST(body as char(65535)), created_at FROM entries WHERE id = :entry_id" -%>
-        <% result = @db.exec({Int32, Int32, Bool, Slice(UInt8), Time}, query, {"entry_id" => comment.entry_id}) -%>
-        <% entry_id, entry_user_id, entry_private_flag, entry_body, entry_created_at= result.first -%>
+        <% rs = @db.query(query, {"entry_id" => comment.entry_id}) -%>
+        <% entry_id, entry_user_id, entry_private_flag, entry_body, entry_created_at = rs.read(Int32), rs.read(Int32), rs.read(Bool), rs.read(String), rs.read(Time) -%>
         <% entry_owner = get_user(entry_user_id) -%>
         <li class="list-group-item comment-from-to">
           <a href="/profile/<%= comment_owner.account_name %>"><%= comment_owner.nick_name %>さん</a>から
