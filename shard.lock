@@ -17,8 +17,8 @@ shards:
     version: 0.3.3
 
   mysql:
-    github: crystal-lang/crystal-mysql
-    version: 0.3.2
+    github: at-grandpa/crystal-mysql
+    commit: bb2c33ad6dcf4c54ea925a17654f16f6bb9858c3
 
   radix:
     github: luislavena/radix

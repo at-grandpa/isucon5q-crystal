@@ -106,4 +106,8 @@ docker/isucon/build/app:
 		sudo systemctl restart isuxi.crystal \
 		"
 
+docker/isucon/bench:
+	$(DOCKER_EXEC) -u isucon $(CONTAINER_NAME) /bin/bash /home/isucon/bench.sh
+
+docker/isucon/build_and_bench: docker/isucon/build/app docker/isucon/bench
 

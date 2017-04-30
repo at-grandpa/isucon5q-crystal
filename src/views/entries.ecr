@@ -46,9 +46,8 @@
       <div class="text-danger entry-private">範囲: 友だち限定公開</div>
     <% end -%>
     <div class="entry-created-at">更新日時: <%= entry.created_at.to_s("%Y-%m-%d %H:%M:%S") %></div>
-    <% query = "SELECT COUNT(*) AS c FROM comments WHERE entry_id = :entry_id" -%>
-    <% rs  = @db.query(query, {"entry_id" => entry.id}) -%>
-    <% cnt = rs.read(Int64) -%>
+    <% query = "SELECT COUNT(*) AS c FROM comments WHERE entry_id = ?" -%>
+    <% cnt = @db.query_one(query, entry.id, as: Int64) -%>
     <div class="entry-comments">コメント: <%= cnt %>件</div>
   </div>
   <% end -%>
